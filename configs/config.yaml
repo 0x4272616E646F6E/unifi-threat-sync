@@ -1,0 +1,75 @@
+unifi:
+  url: https://udm-pro.local
+  site: default
+  username: ${UNIFI_USER}
+  password: ${UNIFI_PASS}
+  groupName: uts-block-list
+  ruleset: WAN_OUT
+  ruleIndex: 2000
+
+sync:
+  interval: 60m
+
+health:
+  enabled: true
+  port: 8080
+
+feeds:
+  # FireHOL Level 1 - Uses netset parser
+  - name: "FireHOL Level 1"
+    url: https://iplists.firehol.org/files/firehol_level1.netset
+    parser: netset
+    enabled: true
+    
+  # Spamhaus DROP - Uses plain parser
+  - name: "Spamhaus DROP"
+    url: https://www.spamhaus.org/drop/drop.txt
+    parser: plain
+    enabled: true
+    
+  # Spamhaus EDROP
+  - name: "Spamhaus EDROP"
+    url: https://www.spamhaus.org/drop/edrop.txt
+    parser: plain
+    enabled: true
+    
+  # Emerging Threats - Uses plain parser
+  - name: "Emerging Threats Compromised"
+    url: https://rules.emergingthreats.net/blockrules/compromised-ips.txt
+    parser: plain
+    enabled: true
+    
+  # AbuseIPDB - Uses abuseipdb parser (handles auth + JSON parsing)
+  - name: "AbuseIPDB"
+    url: https://api.abuseipdb.com/api/v2/blacklist
+    parser: abuseipdb
+    auth:
+      apiKey: ${ABUSEIPDB_API_KEY}  # Set via environment variable
+    params:
+      confidenceMinimum: 90
+      limit: 10000
+    enabled: false  # Enable after adding API key
+    
+  # CI Army List
+  - name: "CI Army List"
+    url: http://cinsscore.com/list/ci-badguys.txt
+    parser: plain
+    enabled: true
+    
+  # Blocklist.de
+  - name: "Blocklist.de All"
+    url: https://lists.blocklist.de/lists/all.txt
+    parser: plain
+    enabled: true
+    
+  # AlienVault OTX - Uses alienvault parser
+  - name: "AlienVault OTX"
+    url: https://reputation.alienvault.com/reputation.generic
+    parser: alienvault
+    enabled: true
+    
+  # Talos Intelligence
+  - name: "Talos Intelligence"
+    url: https://www.talosintelligence.com/documents/ip-blacklist
+    parser: plain
+    enabled: true

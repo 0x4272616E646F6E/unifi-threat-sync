@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: unifi-threat-sync-config
+  namespace: default
+data:
+  config.yaml: |
+    unifi:
+      url: https://udm-pro.local
+      site: default
+      username: ${UNIFI_USER}
+      password: ${UNIFI_PASS}
+      groupName: uts-block-list
+      ruleset: WAN_OUT
+      ruleIndex: 2000
+    
+    sync:
+      interval: 60m
+    
+    health:
+      enabled: true
+      port: 8080
+    
+    feeds:
+      - name: "Spamhaus DROP"
+        url: https://www.spamhaus.org/drop/drop.txt
+        parser: plain
+        enabled: true
+      
+      - name: "FireHOL Level 1"
+        url: https://iplists.firehol.org/files/firehol_level1.netset
+        parser: netset
+        enabled: true
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unifi-threat-sync
+  namespace: default
+  labels:
+    app: unifi-threat-sync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unifi-threat-sync
+  template:
+    metadata:
+      labels:
+        app: unifi-threat-sync
+    spec:
+      containers:
+      - name: unifi-threat-sync
+        image: ghcr.io/0x4272616e646f6e/unifi-threat-sync:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - name: health
+          containerPort: 8080
+          protocol: TCP
+        
+        env:
+        - name: UNIFI_USER
+          valueFrom:
+            secretKeyRef:
+              name: unifi-auth
+              key: username
+        - name: UNIFI_PASS
+          valueFrom:
+            secretKeyRef:
+              name: unifi-auth
+              key: password
+        
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65532
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      
+      volumes:
+      - name: config
+        configMap:
+          name: unifi-threat-sync-config
+      
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unifi-threat-sync
+  namespace: default
+  labels:
+    app: unifi-threat-sync
+spec:
+  type: ClusterIP
+  ports:
+  - name: health
+    port: 8080
+    targetPort: health
+    protocol: TCP
+  selector:
+    app: unifi-threat-sync
